@@ -17,7 +17,13 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
+from django.http import JsonResponse  # Add this import
+
+def test_connection(request):
+    return JsonResponse({"status": "success", "message": "Connection to Django backend successful!"})
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('api/test-connection/', test_connection, name='test_connection_with_slash'),
+    path('api/test-connection', test_connection, name='test_connection_without_slash'),
 ]
