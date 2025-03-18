@@ -68,6 +68,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Your Next.js development server
 ]
 
+# During development
+CORS_ALLOW_ALL_ORIGINS = True  # Only in development
+CORS_ALLOW_CREDENTIALS = True
+
 ROOT_URLCONF = "backend.urls"
 
 TEMPLATES = [
