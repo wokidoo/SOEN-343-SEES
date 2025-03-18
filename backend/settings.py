@@ -39,6 +39,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "backend",
+    'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',  # For handling CORS
 ]
 
 MIDDLEWARE = [
@@ -49,6 +52,20 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+]
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+}
+
+# CORS settings to allow your Next.js frontend to connect
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Your Next.js development server
 ]
 
 ROOT_URLCONF = "backend.urls"
