@@ -51,6 +51,37 @@ python manage.py runserver
 
 Visit `http://127.0.0.1:8000/` in your browser.
 
+### Running the Frontend
+
+#### 1. Entering the frented Directory
+
+In the Terminal, run the following commands
+
+```sh
+cd frontend
+```
+#### 2. Installing npm dependencies
+
+Then, run the following to install the npm dependencies
+
+```sh
+npm install
+```
+
+#### 3. Run the project
+
+Finally, run the following in the terminal to run the project
+```sh
+npm run dev
+```
+
+and click on the 
+
+```sh
+localhost:3000
+```
+
+to access the webpage for the SEES
 
 ## **Additional Notes**
 ### **Database Migrations**
