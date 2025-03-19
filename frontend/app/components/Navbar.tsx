@@ -14,8 +14,8 @@ const Navbar: React.FC<NavbarProps> = ({ className = '' }) => {
   
   const navItems = [
     { name: 'Dashboard', path: '/dashboard' },
-    { name: 'Your Events', path: '/tab1' },
-    { name: 'Create Event', path: '/tab2' },
+    { name: 'Your Events', path: '/my-event' },
+    { name: 'Create Event', path: '/create-event' },
     { name: 'Your Profile', path: '/tab3' },
     { name: 'Logout', path: '/login' },
   ];
