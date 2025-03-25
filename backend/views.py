@@ -2,7 +2,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, get_user_model
-from .serializers import UserSerializer
+
+from .serializers import UserSerializer, EventSerializer  #UPDATED import
+from .models import Event  #NEW import
 
 User = get_user_model()
 
@@ -77,3 +79,19 @@ class UserLoginView(APIView):
             {'error': 'Invalid credentials'},
             status=status.HTTP_401_UNAUTHORIZED
         )
+
+# List or create events
+class EventListCreateView(APIView):
+    def get(self, request):
+        """Return a list of all events."""
+        events = Event.objects.all()
+        serializer = EventSerializer(events, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        """Create a new event."""
+        serializer = EventSerializer(data=request.data)
+        if serializer.is_valid():
+            event = serializer.save()  # saves the new event to DB
+            return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
