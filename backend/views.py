@@ -9,6 +9,12 @@ from .models import Event  #NEW import
 User = get_user_model()
 
 class UserRegisterView(APIView):
+    def get(self, request):
+        """Return a list of all users."""
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
     def post(self, request):
         # Extract data from request
         email = request.data.get('email')
@@ -95,3 +101,32 @@ class EventListCreateView(APIView):
             event = serializer.save()  # saves the new event to DB
             return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Detail view for a single event
+class EventDetailView(APIView):
+    def get_object(self, pk):
+        try:
+            return Event.objects.get(pk=pk)
+        except Event.DoesNotExist:
+            raise Http404
+    
+    def get(self, request, pk):
+        """Return details of a specific event."""
+        event = self.get_object(pk)
+        serializer = EventSerializer(event)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def put(self, request, pk):
+        """Update an existing event."""
+        event = self.get_object(pk)
+        serializer = EventSerializer(event, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, pk):
+        """Delete an event."""
+        event = self.get_object(pk)
+        event.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
