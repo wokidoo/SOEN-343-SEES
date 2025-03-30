@@ -119,11 +119,12 @@ class Event(models.Model):
             raise ValidationError(
                 "A hybrid event must have both a physical and virtual location."
             )
-            
+
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"{self.title} ({self.get_event_type_display()})"
+
 
 class EventNotification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -132,4 +133,4 @@ class EventNotification(models.Model):
     notified_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'event')
+        unique_together = ("user", "event")

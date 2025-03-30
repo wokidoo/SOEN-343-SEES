@@ -17,14 +17,19 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
-from .views import EventDetailView, UserLoginView, UserRegisterView, EventListCreateView, MarkEventAsViewedView  # <-- UPDATED import
+from .views import (
+    EventDetailView,
+    UserLoginView,
+    UserRegisterView,
+    EventListCreateView,
+    MarkEventAsViewedView,
+)  # <-- UPDATED import
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('api/users/', UserRegisterView.as_view(), name='user-register'),
-    path('api/login/', UserLoginView.as_view(), name='user-login'),
-    path('api/events/', EventListCreateView.as_view(), name='events-list-create'),
-    path('api/events/<int:pk>/mark-viewed/', MarkEventAsViewedView.as_view()),
-    path('api/events/<int:pk>/', EventDetailView.as_view(), name='event-detail'),
+    path("api/users/", UserRegisterView.as_view(), name="user-register"),
+    path("api/login/", UserLoginView.as_view(), name="user-login"),
+    path("api/events/", EventListCreateView.as_view(), name="events-list-create"),
+    path("api/events/<int:pk>/mark-viewed/", MarkEventAsViewedView.as_view()),
+    path("api/events/<int:pk>/", EventDetailView.as_view(), name="event-detail"),
 ]
-
