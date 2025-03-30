@@ -1,10 +1,7 @@
-// app/utils/api.ts - Updated with Event Service
-
 import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// Create axios instance
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -12,7 +9,18 @@ const api = axios.create({
   },
 });
 
-// User service functions
+// ✅ Automatically attach token from localStorage to every request
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Token ${token}`;
+    }
+  }
+  return config;
+});
+
+// User service
 export const userService = {
   register: async (userData: {
     email: string;
@@ -31,20 +39,22 @@ export const userService = {
   },
 };
 
-// Event types based on your Django model
+// Event model structure
 export interface EventData {
+  id?: number;
   title: string;
   description: string;
-  date: string; // ISO format
+  date: string;
   event_type: "in_person" | "virtual" | "hybrid";
   location?: string;
   virtual_location?: string;
   organizers?: number[];
   speakers?: number[];
   attendees?: number[];
+  has_unread_update?: boolean; // ✅ used for red dot
 }
 
-// Event service functions
+// Event service
 export const eventService = {
   getEvents: async () => {
     const response = await api.get("/api/events/");
@@ -70,9 +80,15 @@ export const eventService = {
     const response = await api.delete(`/api/events/${id}/`);
     return response.data;
   },
+
+  // ✅ mark viewed for red dot
+  markEventAsViewed: async (id: number) => {
+    const response = await api.post(`/api/events/${id}/mark-viewed/`);
+    return response.data;
+  },
 };
 
-// User type definition
+// User structure
 export interface User {
   id: number;
   email: string;
@@ -81,5 +97,4 @@ export interface User {
   phone?: string;
 }
 
-// Export default API instance
 export default api;

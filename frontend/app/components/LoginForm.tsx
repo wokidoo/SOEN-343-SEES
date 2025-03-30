@@ -21,13 +21,18 @@ const LoginForm = () => {
     
     try {
       const response = await userService.login({ email, password });
+
+      // ✅ Store token for authenticated requests
+      localStorage.setItem("token", response.token);
+
       setSuccess(true);
       setUserData(response);
+
       // Clear form
       setEmail('');
       setPassword('');
-      
-      // Redirect after a delay if needed
+
+      // Redirect after a delay (optional)
       setTimeout(() => {
         router.push('/dashboard');
       }, 1500);
@@ -44,7 +49,6 @@ const LoginForm = () => {
         <h3 className="font-bold mb-2">Login Successful!</h3>
         <p>Welcome, {userData?.first_name} {userData?.last_name}!</p>
         <p className="text-sm mt-2">You are now logged in.</p>
-        {/* You can add navigation buttons here */}
         <div className="mt-4 flex space-x-4">
           <Link href="/dashboard" className="bg-[#72A276] text-white px-4 py-2 rounded hover:bg-[#666B6A]">
             Go to Dashboard

@@ -2,9 +2,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, get_user_model
-
+from rest_framework.permissions import IsAuthenticated
 from .serializers import UserSerializer, EventSerializer  #UPDATED import
-from .models import Event  #NEW import
+from .models import Event, EventNotification  #NEW import
 
 User = get_user_model()
 
@@ -61,45 +61,57 @@ class UserRegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+from rest_framework.authtoken.models import Token
+
 class UserLoginView(APIView):
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
-        
+
         if not email or not password:
             return Response(
                 {'error': 'Please provide both email and password'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-            
+
         user = authenticate(request, email=email, password=password)
-        
+
         if user:
-            # Return user data
-            return Response(
-                UserSerializer(user).data,
-                status=status.HTTP_200_OK
-            )
-        
+            token, _ = Token.objects.get_or_create(user=user)
+
+            return Response({
+                'token': token.key,
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+            }, status=status.HTTP_200_OK)
+
         return Response(
             {'error': 'Invalid credentials'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
+
 # List or create events
 class EventListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        """Return a list of all events."""
+        user = request.user
+        # Get all events where user is organizer, speaker, or attendee
+        print("🔒 USER:", request.user)
+        print("🔒 Is Authenticated:", request.user.is_authenticated)
         events = Event.objects.all()
-        serializer = EventSerializer(events, many=True)
+
+        serializer = EventSerializer(events, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     def post(self, request):
-        """Create a new event."""
         serializer = EventSerializer(data=request.data)
         if serializer.is_valid():
-            event = serializer.save()  # saves the new event to DB
-            return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
+            event = serializer.save()
+            return Response(EventSerializer(event, context={"request": request}).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Detail view for a single event
@@ -130,3 +142,16 @@ class EventDetailView(APIView):
         event = self.get_object(pk)
         event.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class MarkEventAsViewedView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            event = Event.objects.get(pk=pk)
+            notif, _ = EventNotification.objects.get_or_create(user=request.user, event=event)
+            notif.is_viewed = True
+            notif.save()
+            return Response({"success": True})
+        except Event.DoesNotExist:
+            return Response({"error": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
