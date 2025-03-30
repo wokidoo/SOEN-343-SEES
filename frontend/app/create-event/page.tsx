@@ -106,7 +106,7 @@ const CreateEvent = () => {
 
   // Handle navigation
   const navigateToEvents = () => {
-    router.push("/events");
+    router.push("/my-event");
   };
 
   // Handle form submission
