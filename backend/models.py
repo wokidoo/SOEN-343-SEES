@@ -120,5 +120,17 @@ class Event(models.Model):
                 "A hybrid event must have both a physical and virtual location."
             )
 
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return f"{self.title} ({self.get_event_type_display()})"
+
+
+class EventNotification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+    is_viewed = models.BooleanField(default=False)
+    notified_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "event")

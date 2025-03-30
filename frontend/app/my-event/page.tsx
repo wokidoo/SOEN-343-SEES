@@ -5,8 +5,6 @@ import Head from "next/head";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import { eventService } from "../utils/api";
-
-// Import types from API
 import type { EventData } from "../utils/api";
 
 const MyEvents = () => {
@@ -15,17 +13,14 @@ const MyEvents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal states
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
-  // Form state for editing
   const [editFormData, setEditFormData] = useState<EventData | null>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const data = await eventService.getEvents();
+        const data = await eventService.getEvents(); // flat list
         setEvents(data);
       } catch (err) {
         console.error(err);
@@ -34,25 +29,33 @@ const MyEvents = () => {
         setLoading(false);
       }
     };
-
+  
     fetchEvents();
   }, []);
 
-  // Open edit modal
-  const openEditModal = (event: EventData) => {
+  const openEditModal = async (event: EventData) => {
+    try {
+      await eventService.markEventAsViewed(event.id);
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === event.id ? { ...e, has_unread_update: false } : e
+        )
+      );
+    } catch (err) {
+      console.error("Failed to mark event as viewed", err);
+    }
+
     setSelectedEvent(event);
     setEditFormData({ ...event });
     setIsEditModalOpen(true);
   };
 
-  // Close modals
   const closeEditModal = () => {
     setIsEditModalOpen(false);
     setEditFormData(null);
     setSelectedEvent(null);
   };
 
-  // Handle edit form changes
   const handleEditChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -62,35 +65,24 @@ const MyEvents = () => {
     setEditFormData((prev) => (prev ? { ...prev, [name]: value } : null));
   };
 
-  // Handle edit form submission
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFormData || !selectedEvent?.id) return;
 
     try {
-      // Until the backend endpoint is available, we'll update locally only
-      // Once the backend is ready, uncomment the next line:
-      // await eventService.updateEvent(selectedEvent.id, editFormData);
-
-      // Update the events list with the edited event (frontend only for now)
       setEvents(
         events.map((event) =>
           event.id === selectedEvent.id ? { ...event, ...editFormData } : event
         )
       );
       closeEditModal();
-
-      // Show a temporary "success" message
-      alert(
-        "Event updated successfully (frontend only - backend endpoint needs to be created)"
-      );
+      alert("Event updated successfully (frontend only)");
     } catch (err) {
       console.error("Error updating event:", err);
       alert("Failed to update event. Please try again.");
     }
   };
 
-  // Format event date/time
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -102,7 +94,6 @@ const MyEvents = () => {
     });
   };
 
-  // Get event type display name
   const getEventTypeDisplay = (type: string) => {
     const typeMap: Record<string, string> = {
       in_person: "In-Person",
@@ -167,12 +158,16 @@ const MyEvents = () => {
             {events.map((event) => (
               <div
                 key={event.id}
-                className="rounded-lg shadow-md overflow-hidden"
+                className="relative rounded-lg shadow-md overflow-hidden"
                 style={{
                   backgroundColor: "white",
                   borderTop: "4px solid #86CD82",
                 }}
               >
+                {event.has_unread_update && (
+                  <span className="absolute top-2 right-2 h-3 w-3 bg-red-500 rounded-full" />
+                )}
+
                 <div className="p-5">
                   <div className="flex justify-between items-start">
                     <h2
@@ -303,208 +298,6 @@ const MyEvents = () => {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Edit Event Modal */}
-        {isEditModalOpen && selectedEvent && editFormData && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-start">
-                  <h2
-                    className="text-2xl font-bold"
-                    style={{ color: "#08090A" }}
-                  >
-                    Edit Event
-                  </h2>
-                  <button
-                    onClick={closeEditModal}
-                    className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-
-                <form onSubmit={handleEditSubmit} className="mt-4 space-y-4">
-                  {/* Title */}
-                  <div>
-                    <label
-                      htmlFor="title"
-                      className="block text-sm font-medium"
-                      style={{ color: "#666B6A" }}
-                    >
-                      Event Title
-                    </label>
-                    <input
-                      type="text"
-                      id="title"
-                      name="title"
-                      value={editFormData.title}
-                      onChange={handleEditChange}
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 p-2"
-                      style={{ borderColor: "#72A276" }}
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label
-                      htmlFor="description"
-                      className="block text-sm font-medium"
-                      style={{ color: "#666B6A" }}
-                    >
-                      Description
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={editFormData.description}
-                      onChange={handleEditChange}
-                      rows={4}
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 p-2"
-                      style={{ borderColor: "#72A276" }}
-                    />
-                  </div>
-
-                  {/* Date */}
-                  <div>
-                    <label
-                      htmlFor="date"
-                      className="block text-sm font-medium"
-                      style={{ color: "#666B6A" }}
-                    >
-                      Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      id="date"
-                      name="date"
-                      value={
-                        editFormData.date
-                          ? new Date(editFormData.date)
-                              .toISOString()
-                              .slice(0, 16)
-                          : ""
-                      }
-                      onChange={handleEditChange}
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 p-2"
-                      style={{ borderColor: "#72A276" }}
-                    />
-                  </div>
-
-                  {/* Event Type */}
-                  <div>
-                    <label
-                      htmlFor="event_type"
-                      className="block text-sm font-medium"
-                      style={{ color: "#666B6A" }}
-                    >
-                      Event Type
-                    </label>
-                    <select
-                      id="event_type"
-                      name="event_type"
-                      value={editFormData.event_type}
-                      onChange={handleEditChange}
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 p-2"
-                      style={{ borderColor: "#72A276" }}
-                    >
-                      <option value="in_person">In-Person</option>
-                      <option value="virtual">Virtual</option>
-                      <option value="hybrid">Hybrid</option>
-                    </select>
-                  </div>
-
-                  {/* Conditional location fields based on event type */}
-                  {(editFormData.event_type === "in_person" ||
-                    editFormData.event_type === "hybrid") && (
-                    <div>
-                      <label
-                        htmlFor="location"
-                        className="block text-sm font-medium"
-                        style={{ color: "#666B6A" }}
-                      >
-                        Physical Location
-                      </label>
-                      <input
-                        type="text"
-                        id="location"
-                        name="location"
-                        value={editFormData.location || ""}
-                        onChange={handleEditChange}
-                        required
-                        className="mt-1 block w-full rounded-md border border-gray-300 p-2"
-                        style={{ borderColor: "#72A276" }}
-                      />
-                    </div>
-                  )}
-
-                  {(editFormData.event_type === "virtual" ||
-                    editFormData.event_type === "hybrid") && (
-                    <div>
-                      <label
-                        htmlFor="virtual_location"
-                        className="block text-sm font-medium"
-                        style={{ color: "#666B6A" }}
-                      >
-                        Virtual Location (URL)
-                      </label>
-                      <input
-                        type="url"
-                        id="virtual_location"
-                        name="virtual_location"
-                        value={editFormData.virtual_location || ""}
-                        onChange={handleEditChange}
-                        required
-                        className="mt-1 block w-full rounded-md border border-gray-300 p-2"
-                        style={{ borderColor: "#72A276" }}
-                        placeholder="https://zoom.us/j/123456789"
-                      />
-                    </div>
-                  )}
-
-                  <div className="mt-6 flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      className="px-4 py-2 rounded-md cursor-pointer hover:bg-gray-100 transition-colors"
-                      style={{
-                        backgroundColor: "white",
-                        color: "#666B6A",
-                        border: "1px solid #666B6A",
-                      }}
-                      onClick={closeEditModal}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 rounded-md text-white cursor-pointer hover:opacity-90 transition-opacity"
-                      style={{ backgroundColor: "#86CD82" }}
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
           </div>
         )}
       </main>
