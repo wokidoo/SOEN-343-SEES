@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -98,13 +99,27 @@ class EventListCreateView(APIView):
 
     def get(self, request):
         user = request.user
-        # Get all events where user is organizer, speaker, or attendee
-        print("🔒 USER:", request.user)
-        print("🔒 Is Authenticated:", request.user.is_authenticated)
-        events = Event.objects.all()
 
-        serializer = EventSerializer(events, many=True, context={"request": request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        def serialize_with_notification(events_queryset):
+            result = []
+            for event in events_queryset:
+                notif = EventNotification.objects.filter(user=user, event=event).first()
+                event_data = EventSerializer(event).data
+                event_data["has_unread_update"] = not notif.is_viewed if notif else True
+                result.append(event_data)
+            return result
+
+        organized_events = Event.objects.filter(organizers=user)
+        speaking_events = Event.objects.filter(speakers=user)
+        attending_events = Event.objects.filter(attendees=user)
+
+        data = {
+            "organized": serialize_with_notification(organized_events),
+            "speaking": serialize_with_notification(speaking_events),
+            "attending": serialize_with_notification(attending_events),
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request):
         serializer = EventSerializer(data=request.data)

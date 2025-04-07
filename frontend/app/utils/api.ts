@@ -9,7 +9,7 @@ const api = axios.create({
   },
 });
 
-// ✅ Automatically attach token from localStorage to every request
+// Automatically attach token from localStorage to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem("token");
@@ -81,7 +81,7 @@ export const eventService = {
     return response.data;
   },
 
-  // ✅ mark viewed for red dot
+  // mark viewed for red dot
   markEventAsViewed: async (id: number) => {
     const response = await api.post(`/api/events/${id}/mark-viewed/`);
     return response.data;
