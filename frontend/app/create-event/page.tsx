@@ -1,25 +1,22 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/navigation";
 import api, { eventService, User } from "../utils/api";
 import Navbar from "../components/Navbar";
-
 // Color palette
 // Pistachio: #86CD82
 // Asparagus: #72A276
 // Dim Gray: #666B6A
 // Black: #08090A
 // Alice Blue: #EAF6FF
-
 const CreateEvent = () => {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
   // Form state
   const [formData, setFormData] = useState({
     title: "",
@@ -33,18 +30,48 @@ const CreateEvent = () => {
     speakers: [],
   });
 
-  // Load users for organizer/speaker selection
+  // Load users and identify current user
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchUsersAndCurrentUser = async () => {
       try {
-        const response = await api.get("/api/users/");
-        setUsers(response.data);
+        // First, try to get the current user's profile
+        const token = localStorage.getItem("token");
+
+        if (token) {
+          try {
+            // Attempt to fetch current user profile
+            // This is a placeholder - replace with your actual profile endpoint
+            const profileResponse = await api.get("/api/profile/");
+            const profileData = profileResponse.data;
+
+            // Now fetch all users
+            const usersResponse = await api.get("/api/users/");
+            const allUsers = usersResponse.data;
+
+            // Set current user from profile data
+            setCurrentUser(profileData);
+            console.log("Current user:", profileData);
+
+            // Filter out current user from users list
+            setUsers(allUsers.filter((u) => u.id !== profileData.id));
+          } catch (profileError) {
+            console.error("Error fetching profile:", profileError);
+
+            // Fallback: fetch all users and handle user selection manually
+            const usersResponse = await api.get("/api/users/");
+            setUsers(usersResponse.data);
+          }
+        } else {
+          // No token, just fetch all users
+          const usersResponse = await api.get("/api/users/");
+          setUsers(usersResponse.data);
+        }
       } catch (err) {
         console.error("Error fetching users:", err);
       }
     };
 
-    fetchUsers();
+    fetchUsersAndCurrentUser();
   }, []);
 
   // Handle input changes
@@ -55,20 +82,17 @@ const CreateEvent = () => {
       [name]: value,
     });
   };
-
   // Handle select changes for multi-select (organizers, speakers)
   const handleMultiSelectChange = (e) => {
     const { name, options } = e.target;
     const selectedValues = Array.from(options)
       .filter((option) => option.selected)
       .map((option) => option.value);
-
     setFormData({
       ...formData,
       [name]: selectedValues,
     });
   };
-
   // Form validation
   const validateForm = () => {
     // Required fields
@@ -76,20 +100,17 @@ const CreateEvent = () => {
       setError("Please fill in all required fields.");
       return false;
     }
-
     // Validate based on event type
     if (formData.event_type === "in_person" && !formData.location) {
       setError("An in-person event must have a physical location.");
       return false;
     }
-
     if (formData.event_type === "virtual" && !formData.virtual_location) {
       setError(
         "A virtual event must have a virtual location (e.g., Zoom link)."
       );
       return false;
     }
-
     if (
       formData.event_type === "hybrid" &&
       (!formData.location || !formData.virtual_location)
@@ -99,30 +120,26 @@ const CreateEvent = () => {
       );
       return false;
     }
-
     setError("");
     return true;
   };
-
   // Handle navigation
   const navigateToEvents = () => {
     router.push("/my-event");
   };
-
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) {
       return;
     }
-
     setLoading(true);
-
     try {
       // Combine date and time
       const dateTime = formData.date + "T" + (formData.time || "00:00");
 
+      // Submit to API using our event service
+      // Note: The backend will automatically add the current user as an organizer
       const eventData = {
         title: formData.title,
         description: formData.description,
@@ -134,11 +151,8 @@ const CreateEvent = () => {
         speakers: formData.speakers,
       };
 
-      // Submit to API using our event service
       await eventService.createEvent(eventData);
-
       setSuccess(true);
-
       // Redirect to events list after successful creation
       setTimeout(() => {
         navigateToEvents();
@@ -150,7 +164,6 @@ const CreateEvent = () => {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#EAF6FF" }}>
       <Head>
@@ -158,9 +171,7 @@ const CreateEvent = () => {
         <meta name="description" content="Create a new educational event" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-
       <Navbar />
-
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div
@@ -175,7 +186,6 @@ const CreateEvent = () => {
                 Fill in the details below to create a new educational event.
               </p>
             </div>
-
             {error && (
               <div
                 className="mt-4 p-4 rounded-md"
@@ -186,7 +196,6 @@ const CreateEvent = () => {
                 </div>
               </div>
             )}
-
             {success && (
               <div
                 className="mt-4 p-4 rounded-md"
@@ -199,7 +208,6 @@ const CreateEvent = () => {
                 </div>
               </div>
             )}
-
             <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
               {/* Basic Event Information */}
               <div>
@@ -228,7 +236,6 @@ const CreateEvent = () => {
                   />
                 </div>
               </div>
-
               <div>
                 <label
                   htmlFor="description"
@@ -257,7 +264,6 @@ const CreateEvent = () => {
                   Describe what attendees can expect from this event
                 </p>
               </div>
-
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-3">
                   <label
@@ -284,7 +290,6 @@ const CreateEvent = () => {
                     />
                   </div>
                 </div>
-
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="time"
@@ -310,7 +315,6 @@ const CreateEvent = () => {
                   </div>
                 </div>
               </div>
-
               {/* Event Type & Location */}
               <div>
                 <label
@@ -340,7 +344,6 @@ const CreateEvent = () => {
                   </select>
                 </div>
               </div>
-
               {(formData.event_type === "in_person" ||
                 formData.event_type === "hybrid") && (
                 <div>
@@ -377,7 +380,6 @@ const CreateEvent = () => {
                   </div>
                 </div>
               )}
-
               {(formData.event_type === "virtual" ||
                 formData.event_type === "hybrid") && (
                 <div>
@@ -414,7 +416,6 @@ const CreateEvent = () => {
                   </div>
                 </div>
               )}
-
               {/* Organizers & Speakers */}
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                 <div>
@@ -423,7 +424,10 @@ const CreateEvent = () => {
                     className="block text-sm font-medium"
                     style={{ color: "#666B6A" }}
                   >
-                    Organizers
+                    Additional Organizers{" "}
+                    <span style={{ fontSize: "0.75rem" }}>
+                      (you will be added automatically)
+                    </span>
                   </label>
                   <div className="mt-1">
                     <select
@@ -450,7 +454,6 @@ const CreateEvent = () => {
                     Hold Ctrl (or Cmd) to select multiple organizers
                   </p>
                 </div>
-
                 <div>
                   <label
                     htmlFor="speakers"
@@ -473,6 +476,15 @@ const CreateEvent = () => {
                       value={formData.speakers}
                       onChange={handleMultiSelectChange}
                     >
+                      {/* Include current user in speakers options if identified */}
+                      {currentUser && (
+                        <option
+                          key={`speaker-${currentUser.id}`}
+                          value={currentUser.id}
+                        >
+                          {currentUser.first_name} {currentUser.last_name} (you)
+                        </option>
+                      )}
                       {users.map((user) => (
                         <option key={`speaker-${user.id}`} value={user.id}>
                           {user.first_name} {user.last_name} ({user.email})
@@ -485,7 +497,6 @@ const CreateEvent = () => {
                   </p>
                 </div>
               </div>
-
               {/* Submit Buttons */}
               <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
                 <button
@@ -522,5 +533,4 @@ const CreateEvent = () => {
     </div>
   );
 };
-
 export default CreateEvent;

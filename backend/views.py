@@ -1,4 +1,3 @@
-from django.db.models import Q
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -92,39 +91,75 @@ class UserLoginView(APIView):
             {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
         )
 
+class UserProfileView(APIView):
+    """
+    View to retrieve the currently authenticated user's profile
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Return the authenticated user's information"""
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 # List or create events
 class EventListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """
+        Get events categorized by user role:
+        - Events the user is organizing
+        - Events the user is speaking at
+        - Events the user is attending
+        """
         user = request.user
-
-        def serialize_with_notification(events_queryset):
-            result = []
-            for event in events_queryset:
-                notif = EventNotification.objects.filter(user=user, event=event).first()
-                event_data = EventSerializer(event).data
-                event_data["has_unread_update"] = not notif.is_viewed if notif else True
-                result.append(event_data)
-            return result
-
+        
+        # Get events for each role category
         organized_events = Event.objects.filter(organizers=user)
         speaking_events = Event.objects.filter(speakers=user)
         attending_events = Event.objects.filter(attendees=user)
-
-        data = {
-            "organized": serialize_with_notification(organized_events),
-            "speaking": serialize_with_notification(speaking_events),
-            "attending": serialize_with_notification(attending_events),
-        }
-
-        return Response(data, status=status.HTTP_200_OK)
+        
+        # Serialize each event category
+        organized_serializer = EventSerializer(organized_events, many=True, context={"request": request})
+        speaking_serializer = EventSerializer(speaking_events, many=True, context={"request": request})
+        attending_serializer = EventSerializer(attending_events, many=True, context={"request": request})
+        
+        # Return structured response with categorized events
+        return Response({
+            "organized_events": organized_serializer.data,
+            "speaking_events": speaking_serializer.data,
+            "attending_events": attending_serializer.data
+        }, status=status.HTTP_200_OK)
 
     def post(self, request):
-        serializer = EventSerializer(data=request.data)
+        """Create a new event and add current user as organizer."""
+        # Make a mutable copy of the request data
+        data = request.data.copy()
+        
+        # If organizers are provided, make sure we don't duplicate the current user
+        if 'organizers' in data:
+            # Convert to list if it's not already
+            organizers = data.getlist('organizers') if hasattr(data, 'getlist') else data.get('organizers', [])
+            
+            # Convert to a set to remove duplicates
+            organizer_ids = set(int(org_id) for org_id in organizers if str(org_id).isdigit())
+            
+            # Don't include the current user as they'll be added automatically
+            organizer_ids = [org_id for org_id in organizer_ids if org_id != request.user.id]
+            
+            # Update the request data
+            data['organizers'] = organizer_ids
+        
+        serializer = EventSerializer(data=data)
         if serializer.is_valid():
+            # Save the event
             event = serializer.save()
+            
+            # Add the current user as an organizer
+            event.add_organizer(request.user)
+            
             return Response(
                 EventSerializer(event, context={"request": request}).data,
                 status=status.HTTP_201_CREATED,
@@ -134,6 +169,8 @@ class EventListCreateView(APIView):
 
 # Detail view for a single event
 class EventDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get_object(self, pk):
         try:
             return Event.objects.get(pk=pk)
@@ -143,21 +180,60 @@ class EventDetailView(APIView):
     def get(self, request, pk):
         """Return details of a specific event."""
         event = self.get_object(pk)
-        serializer = EventSerializer(event)
+        serializer = EventSerializer(event, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
         """Update an existing event."""
         event = self.get_object(pk)
-        serializer = EventSerializer(event, data=request.data, partial=True)
+        
+        # Check if user is allowed to edit this event
+        if not event.is_organizer(request.user):
+            return Response(
+                {"error": "Only organizers can edit this event."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Make a mutable copy of the request data
+        data = request.data.copy()
+        
+        # Handle organizers list to ensure current user remains an organizer
+        if 'organizers' in data:
+            # Get the organizers from the request
+            organizers = data.getlist('organizers') if hasattr(data, 'getlist') else data.get('organizers', [])
+            
+            # Convert to a set of integers and make sure the current user is included
+            organizer_ids = set(int(org_id) for org_id in organizers if str(org_id).isdigit())
+            organizer_ids.add(request.user.id)
+            
+            # Update the request data
+            data['organizers'] = list(organizer_ids)
+        
+        serializer = EventSerializer(event, data=data, partial=True, context={"request": request})
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            updated_event = serializer.save()
+            
+            # Double-check to make sure the current user is still an organizer
+            if not updated_event.is_organizer(request.user):
+                updated_event.add_organizer(request.user)
+            
+            return Response(
+                EventSerializer(updated_event, context={"request": request}).data, 
+                status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
         """Delete an event."""
         event = self.get_object(pk)
+        
+        # Check if user is allowed to delete this event
+        if not event.is_organizer(request.user):
+            return Response(
+                {"error": "Only organizers can delete this event."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
         event.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
