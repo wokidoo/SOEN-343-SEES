@@ -32,12 +32,25 @@ export const userService = {
     const response = await api.post("/api/users/", userData);
     return response.data;
   },
-
   login: async (credentials: { email: string; password: string }) => {
     const response = await api.post("/api/login/", credentials);
     return response.data;
   },
 };
+
+// User structure
+export interface User {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+}
+
+// Enhanced User interface for detailed user info in events
+export interface UserDetail extends User {
+  full_name?: string;
+}
 
 // Event model structure
 export interface EventData {
@@ -52,49 +65,46 @@ export interface EventData {
   speakers?: number[];
   attendees?: number[];
   has_unread_update?: boolean; // ✅ used for red dot
+  organizers_details?: UserDetail[];
+  speakers_details?: UserDetail[];
+  attendees_details?: UserDetail[];
+  updated_at?: string;
+}
+
+// Events response interface for categorized events
+export interface EventsResponse {
+  organized_events: EventData[];
+  speaking_events: EventData[];
+  attending_events: EventData[];
 }
 
 // Event service
 export const eventService = {
-  getEvents: async () => {
+  getEvents: async (): Promise<EventsResponse> => {
     const response = await api.get("/api/events/");
     return response.data;
   },
-
-  getEvent: async (id: number) => {
+  getEvent: async (id: number): Promise<EventData> => {
     const response = await api.get(`/api/events/${id}/`);
     return response.data;
   },
-
-  createEvent: async (eventData: EventData) => {
+  createEvent: async (eventData: EventData): Promise<EventData> => {
     const response = await api.post("/api/events/", eventData);
     return response.data;
   },
-
-  updateEvent: async (id: number, eventData: Partial<EventData>) => {
+  updateEvent: async (id: number, eventData: Partial<EventData>): Promise<EventData> => {
     const response = await api.put(`/api/events/${id}/`, eventData);
     return response.data;
   },
-
   deleteEvent: async (id: number) => {
     const response = await api.delete(`/api/events/${id}/`);
     return response.data;
   },
-
   // mark viewed for red dot
   markEventAsViewed: async (id: number) => {
     const response = await api.post(`/api/events/${id}/mark-viewed/`);
     return response.data;
   },
 };
-
-// User structure
-export interface User {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  phone?: string;
-}
 
 export default api;
