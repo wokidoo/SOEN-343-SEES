@@ -1,20 +1,22 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { userService } from '../utils/api';
-import Link from 'next/link';
+import React, { useState } from "react";
+import { userService } from "../utils/api";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
-    email: '',
-    first_name: '',
-    last_name: '',
-    password: '',
-    password2: ''
+    email: "",
+    first_name: "",
+    last_name: "",
+    password: "",
+    password2: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -23,7 +25,7 @@ const RegisterForm = () => {
 
   const validateForm = () => {
     if (formData.password !== formData.password2) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return false;
     }
     return true;
@@ -32,55 +34,51 @@ const RegisterForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       await userService.register(formData);
       setSuccess(true);
       // Clear form
       setFormData({
-        email: '',
-        first_name: '',
-        last_name: '',
-        password: '',
-        password2: ''
+        email: "",
+        first_name: "",
+        last_name: "",
+        password: "",
+        password2: "",
       });
+
+      router.push("/login");
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.response?.data?.message || "Registration failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <div className="bg-[#86CD82] border border-[#72A276] text-[#08090A] px-4 py-3 rounded">
-        <p>User registered successfully!</p>
-        <button 
-          className="mt-4 text-sm text-[#08090A] underline"
-          onClick={() => setSuccess(false)}
-        >
-          Register another user
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full max-w-md">
-      <form onSubmit={handleSubmit} className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-        <h2 className="text-2xl mb-6 text-center font-bold text-[#08090A]">Register</h2>
-        
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4"
+      >
+        <h2 className="text-2xl mb-6 text-center font-bold text-[#08090A]">
+          Register
+        </h2>
+
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
-        
+
         <div className="mb-4">
-          <label className="block text-[#666B6A] text-sm font-bold mb-2" htmlFor="email">
+          <label
+            className="block text-[#666B6A] text-sm font-bold mb-2"
+            htmlFor="email"
+          >
             Email
           </label>
           <input
@@ -94,9 +92,12 @@ const RegisterForm = () => {
             required
           />
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-[#666B6A] text-sm font-bold mb-2" htmlFor="first_name">
+          <label
+            className="block text-[#666B6A] text-sm font-bold mb-2"
+            htmlFor="first_name"
+          >
             First Name
           </label>
           <input
@@ -110,9 +111,12 @@ const RegisterForm = () => {
             required
           />
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-[#666B6A] text-sm font-bold mb-2" htmlFor="last_name">
+          <label
+            className="block text-[#666B6A] text-sm font-bold mb-2"
+            htmlFor="last_name"
+          >
             Last Name
           </label>
           <input
@@ -126,9 +130,12 @@ const RegisterForm = () => {
             required
           />
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-[#666B6A] text-sm font-bold mb-2" htmlFor="password">
+          <label
+            className="block text-[#666B6A] text-sm font-bold mb-2"
+            htmlFor="password"
+          >
             Password
           </label>
           <input
@@ -142,9 +149,12 @@ const RegisterForm = () => {
             required
           />
         </div>
-        
+
         <div className="mb-6">
-          <label className="block text-[#666B6A] text-sm font-bold mb-2" htmlFor="password2">
+          <label
+            className="block text-[#666B6A] text-sm font-bold mb-2"
+            htmlFor="password2"
+          >
             Confirm Password
           </label>
           <input
@@ -158,17 +168,17 @@ const RegisterForm = () => {
             required
           />
         </div>
-        
+
         <div className="flex items-center justify-between mb-4">
           <button
             className="bg-[#86CD82] hover:bg-[#72A276] text-[#08090A] font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? 'Registering...' : 'Register'}
+            {isLoading ? "Registering..." : "Register"}
           </button>
         </div>
-        
+
         <div className="text-center text-sm">
           <span className="text-[#666B6A]">Already have an account? </span>
           <Link href="/login" className="text-[#86CD82] hover:text-[#72A276]">
