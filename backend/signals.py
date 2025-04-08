@@ -1,5 +1,3 @@
-# backend/signals.py
-
 from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from django.core.mail import send_mail
@@ -19,10 +17,12 @@ def mark_event_as_unviewed_for_attendees(sender, instance, created, **kwargs):
 @receiver(m2m_changed, sender=Event.attendees.through)
 def send_event_join_email(sender, instance, action, pk_set, **kwargs):
     if action == "post_add" and pk_set:
+        print("m2m_changed signal triggered for attendees:", pk_set)  # Debug print
         for user_id in pk_set:
             try:
                 user = instance.attendees.get(pk=user_id)
-            except Exception:
+            except Exception as e:
+                print("Error retrieving attendee:", e)
                 continue
             subject = f"You're registered for {instance.title}"
             message = (
@@ -36,7 +36,7 @@ def send_event_join_email(sender, instance, action, pk_set, **kwargs):
             send_mail(
                 subject,
                 message,
-                settings.DEFAULT_FROM_EMAIL,  
+                settings.DEFAULT_FROM_EMAIL,
                 [user.email],
                 fail_silently=False,
             )

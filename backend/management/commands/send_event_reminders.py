@@ -1,5 +1,3 @@
-# backend/management/commands/send_event_reminders.py
-
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.core.mail import send_mail
@@ -8,7 +6,7 @@ from backend.models import Event
 from datetime import timedelta
 
 class Command(BaseCommand):
-    help = 'Send email reminders for upcoming events'
+    help = "Send email reminders for upcoming events"
 
     def handle(self, *args, **kwargs):
         now = timezone.now()
