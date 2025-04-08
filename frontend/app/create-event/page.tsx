@@ -497,30 +497,28 @@ const CreateEvent = () => {
                   </p>
                 </div>
               </div>
-              {/* Submit Buttons */}
+              {/* Submit */}
               <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
-                <button
-                  type="button"
-                  className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium"
-                  style={{
-                    backgroundColor: "white",
-                    color: "#666B6A",
-                    borderColor: "#666B6A",
-                    transition: "all 0.2s ease",
-                  }}
-                  onClick={navigateToEvents}
-                >
-                  Cancel
-                </button>
                 <button
                   type="submit"
                   disabled={loading || success}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white"
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white cursor-pointer"
                   style={{
                     backgroundColor: loading || success ? "#72A276" : "#86CD82",
                     borderColor: "#72A276",
                     color: "white",
                     transition: "all 0.2s ease",
+                  }}
+                  onMouseOver={(e) => {
+                    if (!loading && !success) {
+                      e.currentTarget.style.opacity = "0.9";
+                      e.currentTarget.style.boxShadow =
+                        "0 1px 3px rgba(0,0,0,0.12)";
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   {loading ? "Creating..." : "Create Event"}
