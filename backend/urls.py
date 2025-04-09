@@ -23,7 +23,9 @@ from .views import (
     UserRegisterView,
     EventListCreateView,
     MarkEventAsViewedView,
-    UserProfileView
+    UserProfileView,
+    QuizDetailView,
+    MaterialDetailView,
 )
 
 urlpatterns = [
@@ -34,4 +36,6 @@ urlpatterns = [
     path("api/events/", EventListCreateView.as_view(), name="events-list-create"),
     path("api/events/<int:pk>/mark-viewed/", MarkEventAsViewedView.as_view()),
     path("api/events/<int:pk>/", EventDetailView.as_view(), name="event-detail"),
+    path('api/quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
+    path('api/materials/<int:pk>/', MaterialDetailView.as_view(), name='material-detail'),
 ]

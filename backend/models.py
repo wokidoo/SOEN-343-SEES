@@ -1,8 +1,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.core.exceptions import ValidationError
-
-
+    
 class UserManager(BaseUserManager):
     # Custom user manager to use email as the unique identifier instead of username
 
@@ -48,7 +47,6 @@ class User(AbstractUser):
         # Returns all events where the user is an organizer
         return self.organizers.all()
 
-
 class Event(models.Model):
     EVENT_TYPES = [
         ("in_person", "In-Person"),
@@ -66,6 +64,7 @@ class Event(models.Model):
     virtual_location = models.URLField(
         blank=True, null=True
     )  # Virtual link (Zoom, etc.)
+    ticket_price = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
 
     # Many-to-many relationships with User for different roles
     organizers = models.ManyToManyField(User, related_name="organizers", blank=True)
@@ -98,6 +97,14 @@ class Event(models.Model):
 
     def is_attendee(self, user):
         return self.attendees.filter(id=user.id).exists()
+    
+    def add_quiz(self, title, visible=False):
+        """Create and add a new quiz to this event."""
+        return Quiz.objects.create(event=self, title=title, visible=visible)
+
+    def add_material(self, title, file, visible=False):
+        """Create and add a new material to this event."""
+        return Material.objects.create(event=self, title=title, file=file, visible=visible)
 
     def clean(self):
         """Ensure correct fields are filled based on event type."""
@@ -134,3 +141,83 @@ class EventNotification(models.Model):
 
     class Meta:
         unique_together = ("user", "event")
+
+# Ticket model
+class Ticket(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tickets')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='tickets')
+    purchase_date = models.DateTimeField(auto_now_add=True)
+    is_paid = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Ticket for {self.user.email} - {self.event.title}"
+    
+class Payment(models.Model):
+    ticket = models.OneToOneField(Ticket, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_date = models.DateTimeField(auto_now_add=True)
+    payment_method = models.CharField(max_length=50)  # e.g. "credit_card", "paypal", etc.
+    transaction_id = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return f"Payment of {self.amount} for {self.ticket}"
+# Quiz-related models
+class Quiz(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='quizzes')
+    title = models.CharField(max_length=255)
+    visible = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.title} - {self.event.title}"
+
+class Question(models.Model):
+    QUESTION_TYPES = [
+        ('multiple_choice', 'Multiple Choice'),
+        ('true_false', 'True/False'),
+    ]
+    
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
+    question_text = models.TextField()
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES)
+    
+    def __str__(self):
+        return f"{self.question_text[:30]}..."
+
+class QuestionOption(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='options')
+    option_text = models.CharField(max_length=255)
+    is_correct = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"{self.option_text} - {'Correct' if self.is_correct else 'Incorrect'}"
+
+# For materials/files
+class Material(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='materials')
+    title = models.CharField(max_length=255)
+    file = models.FileField(upload_to='event_materials/')
+    visible = models.BooleanField(default=False)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.title} - {self.event.title}"
+
+class UserQuizResponse(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quiz_responses')
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='user_responses')
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    score = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return f"{self.user} - {self.quiz.title}"
+
+class UserQuestionAnswer(models.Model):
+    quiz_response = models.ForeignKey(UserQuizResponse, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    selected_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE, null=True, blank=True)
+    is_correct = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"{self.quiz_response.user} - {self.question.question_text[:20]}"

@@ -247,6 +247,7 @@ const Dashboard: NextPage = () => {
                 key={event.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col relative"
                 style={{ borderTop: "4px solid #86CD82" }}
+                onClick={() => router.push(`/events/${event.id}`)}
               >
                 <div
                   className="absolute right-4 overflow-hidden"
