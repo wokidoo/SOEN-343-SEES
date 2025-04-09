@@ -26,13 +26,15 @@ from .views import (
     UserProfileView,
     QuizDetailView,
     MaterialDetailView,
+    UserSearchView,
 )
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/users/", UserRegisterView.as_view(), name="user-register"),
     path("api/login/", UserLoginView.as_view(), name="user-login"),
-    path("api/profile/", UserProfileView.as_view(), name="user-profile"),  # Add this new endpoint
+    path("api/profile/", UserProfileView.as_view(), name="user-profile"),
+    path('api/users/search/', UserSearchView.as_view(), name='user-search'),
     path("api/events/", EventListCreateView.as_view(), name="events-list-create"),
     path("api/events/<int:pk>/mark-viewed/", MarkEventAsViewedView.as_view()),
     path("api/events/<int:pk>/", EventDetailView.as_view(), name="event-detail"),

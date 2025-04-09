@@ -55,6 +55,15 @@ class QuizSerializer(serializers.ModelSerializer):
                 QuestionOption.objects.create(question=question, **option_data)
         
         return quiz
+    
+    def update(self, instance, validated_data):
+        # Update basic fields
+        instance.title = validated_data.get('title', instance.title)
+        instance.visible = validated_data.get('visible', instance.visible)
+        instance.save()
+        
+        # Note: Questions are typically handled in the view for updates
+        return instance
 
 
 class MaterialSerializer(serializers.ModelSerializer):

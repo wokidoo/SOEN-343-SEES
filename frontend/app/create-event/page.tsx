@@ -47,6 +47,7 @@ const CreateEvent = () => {
     virtual_location: "",
     organizers: [],
     speakers: [],
+    ticket_price: "0.00",
   });
 
   //Speaker and organizer state
@@ -124,6 +125,12 @@ const CreateEvent = () => {
     // Required fields
     if (!formData.title || !formData.description || !formData.date) {
       setError("Please fill in all required fields.");
+      return false;
+    }
+    // Validate ticket price
+    const price = parseFloat(formData.ticket_price);
+    if (isNaN(price) || price < 0) {
+      setError("Ticket price must be a non-negative number.");
       return false;
     }
     // Validate based on event type
@@ -628,6 +635,40 @@ const CreateEvent = () => {
                             <option value="virtual">Virtual</option>
                             <option value="hybrid">Hybrid</option>
                           </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="ticket_price"
+                          className="block text-sm font-medium"
+                          style={{ color: "#666B6A" }}
+                        >
+                          Ticket Price *
+                        </label>
+                        <div className="mt-1">
+                          <div className="relative rounded-md shadow-sm">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 sm:text-sm">$</span>
+                            </div>
+                            <input
+                              type="number"
+                              name="ticket_price"
+                              id="ticket_price"
+                              min="0"
+                              step="0.01"
+                              className="block w-full pl-7 sm:text-sm rounded-md border border-gray-300 px-3 py-2 focus:outline-none"
+                              style={{
+                                backgroundColor: "white",
+                                borderColor: "#72A276",
+                                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                              }}
+                              value={formData.ticket_price}
+                              onChange={handleChange}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs" style={{ color: "#666B6A" }}>
+                            Enter 0 for a free event
+                          </p>
                         </div>
                       </div>
                       {(formData.event_type === "in_person" ||

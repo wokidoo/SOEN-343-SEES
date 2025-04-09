@@ -147,6 +147,16 @@ class EventListCreateView(APIView):
         # Make a mutable copy of the request data
         data = request.data.copy()
         
+        # Ensure ticket_price is properly formatted as Decimal
+        if 'ticket_price' in data:
+            try:
+                # Convert to Decimal to avoid floating point issues
+                from decimal import Decimal
+                data['ticket_price'] = Decimal(str(data['ticket_price']))
+            except (ValueError, decimal.InvalidOperation):
+                # Default to 0 if invalid
+                data['ticket_price'] = Decimal('0.00')
+        
         # Extract and process quizzes data
         quizzes_data = []
         if 'quizzes' in data:
@@ -569,3 +579,18 @@ class MaterialDetailView(APIView):
         
         material.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class UserSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        search_term = request.query_params.get('search', '')
+        if search_term:
+            users = User.objects.filter(
+                models.Q(first_name__icontains=search_term) |
+                models.Q(last_name__icontains=search_term) |
+                models.Q(email__icontains=search_term)
+            )[:10]  # Limit results
+            serializer = UserSerializer(users, many=True)
+            return Response(serializer.data)
+        return Response([])

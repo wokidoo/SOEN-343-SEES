@@ -115,6 +115,11 @@ class Event(models.Model):
                 }
             )
 
+        if self.ticket_price < 0:
+            raise ValidationError(
+                {"ticket_price": "Ticket price cannot be negative."}
+            )
+        
         if self.event_type == "in_person" and not self.location:
             raise ValidationError(
                 {"location": "An in-person event must have a physical location."}
