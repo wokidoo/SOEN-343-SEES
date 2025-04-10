@@ -169,7 +169,7 @@ const CreateEvent = () => {
   };
 
   const navigateToEvents = () => {
-    router.push("/my-event");
+    router.push("/my-events");
   };
 
   //Handles searching of organizers
