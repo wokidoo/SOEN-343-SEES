@@ -14,11 +14,14 @@ import os
 from dotenv import load_dotenv
 from django.shortcuts import redirect
 from django.urls import reverse
+from rest_framework.permissions import AllowAny
+
 
 User = get_user_model()
 
 
 class UserRegisterView(APIView):
+    permission_classes = [AllowAny]  # Add this line
     def get(self, request):
         """Return a list of all users."""
         users = User.objects.all()
@@ -260,6 +263,17 @@ class EventListCreateView(APIView):
             # Update the request data
             data['organizers'] = list(organizer_ids)
         
+        # If speakers are provided, process them the same way as organizers
+        if 'speakers' in data:
+            # Convert to list if it's not already
+            speakers = data.getlist('speakers') if hasattr(data, 'getlist') else data.get('speakers', [])
+            
+            # Convert to a set to remove duplicates
+            speaker_ids = set(int(speaker_id) for speaker_id in speakers if str(speaker_id).isdigit())
+            
+            # Update the request data
+            data['speakers'] = list(speaker_ids)
+        
         # Create the event first without quizzes and materials
         event_data = {k: v for k, v in data.items() if k not in ['quizzes', 'materials', 'files']}
         serializer = EventSerializer(data=event_data)
@@ -298,14 +312,28 @@ class EventListCreateView(APIView):
                         correct_answer_index = question_data.get('correctAnswer', 0)
                         
                         for i, option_text in enumerate(options):
-                            if not option_text.strip():
+                            # Check if option_text is a string before calling strip()
+                            if isinstance(option_text, str) and not option_text.strip():
                                 continue  # Skip empty options
+                            # If it's a dict or other object type, extract the text value or skip
+                            elif isinstance(option_text, dict):
+                                # Try to get text from the dict - assumes there's a 'text' or 'value' key
+                                actual_text = option_text.get('text', option_text.get('value', ''))
+                                if not actual_text:
+                                    continue  # Skip if we can't find a valid text value
                                 
-                            QuestionOption.objects.create(
-                                question=question,
-                                option_text=option_text,
-                                is_correct=(i == correct_answer_index)
-                            )
+                                QuestionOption.objects.create(
+                                    question=question,
+                                    option_text=actual_text,
+                                    is_correct=(i == correct_answer_index)
+                                )
+                            else:
+                                # For any other type, convert to string
+                                QuestionOption.objects.create(
+                                    question=question,
+                                    option_text=str(option_text),
+                                    is_correct=(i == correct_answer_index)
+                                )
                     
                     elif question_type == 'true_false':
                         correct_answer = question_data.get('correctAnswer', 0)
