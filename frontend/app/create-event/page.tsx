@@ -399,6 +399,7 @@ const CreateEvent = () => {
         speakers: formData.speakers,
         quizzes: quizzes.filter(q => q.visible),
         materials: materials.filter(m => m.visible),
+        ticket_price: parseFloat(formData.ticket_price)
       };
 
       await eventService.createEvent(eventData);
