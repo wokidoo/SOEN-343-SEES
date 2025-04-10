@@ -2,7 +2,7 @@
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import Navbar from "../../components/Navbar";
-import api, { EventData, User } from "../../utils/api";
+import api from "../../utils/api";
 
 export default function EventDetailPage() {
   const params = useParams();

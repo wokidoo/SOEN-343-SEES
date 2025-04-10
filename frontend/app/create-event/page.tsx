@@ -655,7 +655,7 @@ const CreateEvent = () => {
                               name="ticket_price"
                               id="ticket_price"
                               min="0"
-                              step="0.01"
+                              step="1"
                               className="block w-full pl-7 sm:text-sm rounded-md border border-gray-300 px-3 py-2 focus:outline-none"
                               style={{
                                 backgroundColor: "white",
