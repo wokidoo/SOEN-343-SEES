@@ -166,6 +166,7 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment of {self.amount} for {self.ticket}"
+    
 # Quiz-related models
 class Quiz(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='quizzes')

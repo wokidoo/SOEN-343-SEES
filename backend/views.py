@@ -3,10 +3,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework.permissions import IsAuthenticated
-from django.http import Http404
+from django.http import Http404, HttpResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from .serializers import UserSerializer, EventSerializer, QuizSerializer, QuestionSerializer, MaterialSerializer
 from .models import Event, EventNotification, Quiz, Question, QuestionOption, Material
 import json
+import stripe
+from django.conf import settings
+from django.shortcuts import redirect
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -594,3 +600,158 @@ class UserSearchView(APIView):
             serializer = UserSerializer(users, many=True)
             return Response(serializer.data)
         return Response([])
+    
+# This test secret API key is a placeholder. Don't include personal details in requests with this key.
+# To see your test secret API key embedded in code samples, sign in to your Stripe account.
+# You can also find your test secret API key at https://dashboard.stripe.com/test/apikeys.
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+class StripeCheckoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, event_id):
+        try:
+            # Get the event
+            try:
+                event = Event.objects.get(pk=event_id)
+            except Event.DoesNotExist:
+                return Response({"error": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
+                
+            # Check if the user is already an attendee
+            if event.is_attendee(request.user):
+                return Response(
+                    {"error": "You are already registered for this event"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if the event is free
+            if event.ticket_price <= 0:
+                # Create ticket for free event
+                ticket = Ticket.objects.create(
+                    user=request.user,
+                    event=event,
+                    is_paid=True
+                )
+                
+                # Add user as attendee
+                event.add_attendee(request.user)
+                
+                return Response({
+                    "success": True,
+                    "message": "You have been registered for this free event.",
+                    "ticket_id": ticket.id
+                }, status=status.HTTP_201_CREATED)
+                
+            # Create a pending ticket
+            ticket = Ticket.objects.create(
+                user=request.user,
+                event=event,
+                is_paid=False
+            )
+            
+            # Create the line item with the event's price
+            line_items = [{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': event.title,
+                        'description': f'Ticket for {event.title}',
+                    },
+                    'unit_amount': int(event.ticket_price * 100),  # Convert to cents
+                },
+                'quantity': 1,
+            }]
+            
+            # Define success and cancel URLs
+            domain = settings.FRONTEND_URL  # Add this to settings.py
+            success_url = f"{domain}/events/{event_id}?payment_success=true"
+            cancel_url = f"{domain}/events/{event_id}?payment_canceled=true"
+            
+            # Create a checkout session
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=line_items,
+                mode='payment',
+                success_url=success_url,
+                cancel_url=cancel_url,
+                customer_email=request.user.email,
+                client_reference_id=event_id,
+                metadata={
+                    'event_id': event_id,
+                    'user_id': request.user.id,
+                    'ticket_id': ticket.id
+                }
+            )
+            
+            # Return the session ID to the frontend
+            return Response({
+                'id': checkout_session.id,
+                'url': checkout_session.url
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@csrf_exempt
+@require_POST
+def stripe_webhook(request):
+    from .services import send_ticket_confirmation_email
+    
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    event = None
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError as e:
+        # Invalid payload
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return HttpResponse(status=400)
+
+    # Handle the checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        
+        # Retrieve event_id, user_id and ticket_id from metadata
+        event_id = session.get('metadata', {}).get('event_id')
+        user_id = session.get('metadata', {}).get('user_id')
+        ticket_id = session.get('metadata', {}).get('ticket_id')
+        
+        if event_id and user_id and ticket_id:
+            try:
+                # Get the event, user and ticket
+                event_obj = Event.objects.get(pk=event_id)
+                user = User.objects.get(pk=user_id)
+                ticket = Ticket.objects.get(pk=ticket_id)
+                
+                # Mark ticket as paid
+                ticket.is_paid = True
+                ticket.save()
+                
+                # Add the user as an attendee
+                event_obj.add_attendee(user)
+                
+                # Create a payment record
+                Payment.objects.create(
+                    ticket=ticket,
+                    amount=session.amount_total / 100,  # Convert from cents
+                    payment_method='credit_card',
+                    transaction_id=session.payment_intent
+                )
+                
+                # Send confirmation email
+                send_ticket_confirmation_email(
+                    user.email,
+                    event_obj.title,
+                    event_obj.date.strftime('%B %d, %Y at %I:%M %p'),
+                    ticket.id
+                )
+                
+            except (Event.DoesNotExist, User.DoesNotExist, Ticket.DoesNotExist) as e:
+                print(f"Error processing payment: {str(e)}")
+    
+    return HttpResponse(status=200)

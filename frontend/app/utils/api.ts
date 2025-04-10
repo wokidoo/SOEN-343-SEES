@@ -317,6 +317,11 @@ export const eventService = {
     const response = await api.post(`/api/events/${id}/mark-viewed/`);
     return response.data;
   },
+
+  checkoutEvent: async (eventId) => {
+    const response = await api.post(`/api/events/${eventId}/checkout/`);
+    return response.data;
+  }
 };
 
 // Quiz service

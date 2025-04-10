@@ -27,6 +27,8 @@ from .views import (
     QuizDetailView,
     MaterialDetailView,
     UserSearchView,
+    StripeCheckoutView,
+    stripe_webhook,
 )
 
 urlpatterns = [
@@ -40,4 +42,6 @@ urlpatterns = [
     path("api/events/<int:pk>/", EventDetailView.as_view(), name="event-detail"),
     path('api/quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
     path('api/materials/<int:pk>/', MaterialDetailView.as_view(), name='material-detail'),
+    path('api/events/<int:event_id>/checkout/', StripeCheckoutView.as_view()),
+    path('webhook/stripe/', stripe_webhook, name='stripe-webhook'),
 ]
