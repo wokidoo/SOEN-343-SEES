@@ -77,6 +77,8 @@ class EventSerializer(serializers.ModelSerializer):
     has_unread_update = serializers.SerializerMethodField()
     quizzes = QuizSerializer(many=True, required=False)
     materials = MaterialSerializer(many=True, required=False)
+    organizers = UserSerializer(many=True, read_only=True)
+    speakers = UserSerializer(many=True, read_only=True)
     
     class Meta:
         model = Event
