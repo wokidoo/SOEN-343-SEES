@@ -10,7 +10,8 @@ from .serializers import UserSerializer, EventSerializer, QuizSerializer, Questi
 from .models import Event, EventNotification, Quiz, Question, QuestionOption, Material
 import json
 import stripe
-from django.conf import settings
+import os
+from dotenv import load_dotenv
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -604,7 +605,8 @@ class UserSearchView(APIView):
 # This test secret API key is a placeholder. Don't include personal details in requests with this key.
 # To see your test secret API key embedded in code samples, sign in to your Stripe account.
 # You can also find your test secret API key at https://dashboard.stripe.com/test/apikeys.
-stripe.api_key = settings.STRIPE_SECRET_KEY
+stripe.api_key = os.getenv("STRIPE_TEST_SECRET_KEY")
+frontendURL = os.getenv("FRONTEND_URL")
 
 class StripeCheckoutView(APIView):
     permission_classes = [IsAuthenticated]
@@ -663,7 +665,7 @@ class StripeCheckoutView(APIView):
             }]
             
             # Define success and cancel URLs
-            domain = settings.FRONTEND_URL  # Add this to settings.py
+            domain = frontendURL # Add this to settings.py
             success_url = f"{domain}/events/{event_id}?payment_success=true"
             cancel_url = f"{domain}/events/{event_id}?payment_canceled=true"
             
@@ -692,6 +694,7 @@ class StripeCheckoutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+stripeWebhook = os.getenv("STRIPE_WEBHOOK_SECRET")
 @csrf_exempt
 @require_POST
 def stripe_webhook(request):
@@ -703,7 +706,7 @@ def stripe_webhook(request):
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            payload, sig_header, stripeWebhook
         )
     except ValueError as e:
         # Invalid payload
