@@ -63,20 +63,25 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Stripe settings
-STRIPE_PUBLISHABLE_KEY = 'pk_test_51RBdYH2KbGpaCmlYeKvKM1KWRiZTZ25F4NQBN4Ii6RRfc99icPAyUzz4XCFlZqrNQ6cv2CpWtR8JBlb3BLPJQyU400IFP0vqfe'
-STRIPE_SECRET_KEY = 'sk_test_51RBdYH2KbGpaCmlYboPLYoS4zHyHL3IKuZR1mP7LKiwfjOj8hkTNmVQdFcPAPXSfdvx0yJX29UUfCVjBFKTFKaiN00Rcmh4SXu'
-STRIPE_WEBHOOK_SECRET = 'your_stripe_webhook_secret'
-FRONTEND_URL = 'http://localhost:3000'
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # Your SMTP server
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'seesnoreply@gmail.com'
-EMAIL_HOST_PASSWORD = 'ZachCharlesPhil'
-DEFAULT_FROM_EMAIL = 'SEES Admin <seesnoreply@gmail.com>'
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+
+# Stripe settings
+STRIPE_TEST_PUBLIC_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+STRIPE_TEST_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_TEST_WEBHOOK_SECRET = os.getenv("STRIPE_TEST_WEBHOOK_SECRET")
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 # CORS settings to allow your Next.js frontend to connect
 CORS_ALLOWED_ORIGINS = [

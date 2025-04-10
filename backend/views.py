@@ -7,15 +7,18 @@ from django.http import Http404, HttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from .serializers import UserSerializer, EventSerializer, QuizSerializer, QuestionSerializer, MaterialSerializer
-from .models import Event, EventNotification, Quiz, Question, QuestionOption, Material
+from .models import Event, EventNotification, Quiz, Question, QuestionOption, Material, Ticket, Payment, User
 import json
+
+from django.conf import settings
 import stripe
-import os
-from dotenv import load_dotenv
 from django.shortcuts import redirect
 from django.urls import reverse
 from rest_framework.permissions import AllowAny
 
+
+import logging
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -202,8 +205,9 @@ class EventListCreateView(APIView):
         if 'ticket_price' in data:
             try:
                 # Convert to Decimal to avoid floating point issues
-                from decimal import Decimal
-                data['ticket_price'] = Decimal(str(data['ticket_price']))
+                from decimal import Decimal, ROUND_HALF_UP
+                rounded_price = price_value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                event.ticket_price = rounded_price
             except (ValueError, decimal.InvalidOperation):
                 # Default to 0 if invalid
                 data['ticket_price'] = Decimal('0.00')
@@ -787,29 +791,39 @@ class UserSearchView(APIView):
 # This test secret API key is a placeholder. Don't include personal details in requests with this key.
 # To see your test secret API key embedded in code samples, sign in to your Stripe account.
 # You can also find your test secret API key at https://dashboard.stripe.com/test/apikeys.
-stripe.api_key = os.getenv("STRIPE_TEST_SECRET_KEY")
-frontendURL = os.getenv("FRONTEND_URL")
+
+stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
+
 
 class StripeCheckoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, event_id):
+        logger.info(f"Starting checkout for event {event_id} by user {request.user.email}")
+    
         try:
             # Get the event
             try:
                 event = Event.objects.get(pk=event_id)
+                logger.info(f"Found event: {event.title}")
             except Event.DoesNotExist:
+                logger.error(f"Event {event_id} not found")
                 return Response({"error": "Event not found"}, status=status.HTTP_404_NOT_FOUND)
                 
             # Check if the user is already an attendee
             if event.is_attendee(request.user):
+                logger.info(f"User {request.user.email} is already attending event {event_id}")
                 return Response(
                     {"error": "You are already registered for this event"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # Log event price
+            logger.info(f"Event price: {event.ticket_price}")
+            
             # Check if the event is free
             if event.ticket_price <= 0:
+                logger.info("Processing free event registration")
                 # Create ticket for free event
                 ticket = Ticket.objects.create(
                     user=request.user,
@@ -819,6 +833,7 @@ class StripeCheckoutView(APIView):
                 
                 # Add user as attendee
                 event.add_attendee(request.user)
+                logger.info(f"Created free ticket {ticket.id} and added user as attendee")
                 
                 return Response({
                     "success": True,
@@ -827,53 +842,78 @@ class StripeCheckoutView(APIView):
                 }, status=status.HTTP_201_CREATED)
                 
             # Create a pending ticket
+            logger.info("Creating pending ticket for paid event")
             ticket = Ticket.objects.create(
                 user=request.user,
                 event=event,
                 is_paid=False
             )
+            logger.info(f"Created pending ticket {ticket.id}")
             
             # Create the line item with the event's price
-            line_items = [{
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {
-                        'name': event.title,
-                        'description': f'Ticket for {event.title}',
+            try:
+                line_items = [{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': event.title,
+                            'description': f'Ticket for {event.title}',
+                        },
+                        'unit_amount': int(event.ticket_price * 100),  # Convert to cents
                     },
-                    'unit_amount': int(event.ticket_price * 100),  # Convert to cents
-                },
-                'quantity': 1,
-            }]
+                    'quantity': 1,
+                }]
+                logger.info(f"Created line items with unit_amount: {int(event.ticket_price * 100)}")
+            except Exception as line_error:
+                logger.error(f"Error creating line items: {str(line_error)}")
+                return Response({"error": f"Error with ticket price: {str(line_error)}"}, status=status.HTTP_400_BAD_REQUEST)
             
             # Define success and cancel URLs
-            domain = frontendURL # Add this to settings.py
+            domain = settings.FRONTEND_URL
+            if not domain:
+                logger.error("FRONTEND_URL not set in settings")
+                return Response({"error": "Server configuration error: FRONTEND_URL not set"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
             success_url = f"{domain}/events/{event_id}?payment_success=true"
             cancel_url = f"{domain}/events/{event_id}?payment_canceled=true"
+            logger.info(f"Success URL: {success_url}, Cancel URL: {cancel_url}")
+            
+            # Verify Stripe API key
+            if not stripe.api_key:
+                logger.error("Stripe API key not set")
+                return Response({"error": "Server configuration error: Stripe API key not set"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             # Create a checkout session
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=line_items,
-                mode='payment',
-                success_url=success_url,
-                cancel_url=cancel_url,
-                customer_email=request.user.email,
-                client_reference_id=event_id,
-                metadata={
-                    'event_id': event_id,
-                    'user_id': request.user.id,
-                    'ticket_id': ticket.id
-                }
-            )
+            try:
+                logger.info("Creating Stripe checkout session")
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    line_items=line_items,
+                    mode='payment',
+                    success_url=success_url,
+                    cancel_url=cancel_url,
+                    customer_email=request.user.email,
+                    client_reference_id=event_id,
+                    metadata={
+                        'event_id': event_id,
+                        'user_id': request.user.id,
+                        'ticket_id': ticket.id
+                    }
+                )
+                logger.info(f"Created checkout session: {checkout_session.id}")
+            except Exception as stripe_error:
+                logger.error(f"Stripe error: {str(stripe_error)}")
+                return Response({"error": f"Stripe error: {str(stripe_error)}"}, status=status.HTTP_400_BAD_REQUEST)
             
             # Return the session ID to the frontend
+            logger.info("Returning checkout session to frontend")
             return Response({
                 'id': checkout_session.id,
                 'url': checkout_session.url
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            logger.error(f"Unhandled error in checkout: {str(e)}", exc_info=True)
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 stripeWebhook = os.getenv("STRIPE_WEBHOOK_SECRET")
