@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Confirmation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            color: #333333;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #86CD82;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .footer {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666666;
+            background-color: #f0f0f0;
+            border-radius: 0 0 5px 5px;
+        }
+        .ticket-details {
+            background-color: white;
+            border: 1px solid #dddddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .ticket-id {
+            background-color: #EAF6FF;
+            padding: 10px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #86CD82;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        h1 {
+            color: #08090A;
+            margin-top: 0;
+        }
+        h2 {
+            color: #08090A;
+            font-size: 18px;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .detail-label {
+            font-weight: bold;
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Ticket Confirmation</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{ user_name }},</p>
+            
+            <p>Thank you for your ticket purchase! You are now registered for the event.</p>
+            
+            <div class="ticket-details">
+                <h2>Event Details</h2>
+                
+                <div class="detail-row">
+                    <div class="detail-label">Event:</div>
+                    <div>{{ event_title }}</div>
+                </div>
+                
+                <div class="detail-row">
+                    <div class="detail-label">Date & Time:</div>
+                    <div>{{ event_date }}</div>
+                </div>
+                
+                <div class="ticket-id">
+                    Ticket ID: {{ ticket_id }}
+                </div>
+            </div>
+            
+            <p>You can view your ticket and event details in your account by clicking the button below:</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ frontend_url }}/my-events" class="button">View My Events</a>
+            </div>
+            
+            <p>We look forward to seeing you at the event!</p>
+            
+            <p>Best regards,<br>SEES Team</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p>&copy; 2025 SEES - Software Engineering Educational System</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,11 +1,11 @@
 "use client";
-import { NextPage } from "next";
-import Head from "next/head";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Head from "next/head";
 import Navbar from "../components/Navbar";
-import api, { eventService, User, EventData } from "../utils/api";
+import api, { EventData, User } from "../utils/api";
 
-const Dashboard: NextPage = () => {
+export default function Dashboard() {
   // State for events and search
   const [events, setEvents] = useState<EventData[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<EventData[]>([]);
@@ -13,6 +13,20 @@ const Dashboard: NextPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const router = useRouter();
+  
+  // Check for payment status from URL query params - this would work with useSearchParams in app router
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentSuccess = params.get('payment_success');
+    const paymentCanceled = params.get('payment_canceled');
+    
+    if (paymentSuccess === "true") {
+      alert("Payment successful! You are now registered for the event.");
+    } else if (paymentCanceled === "true") {
+      alert("Payment was canceled. You can try again later.");
+    }
+  }, []);
 
   // Fetch events and user data
   useEffect(() => {
@@ -78,62 +92,9 @@ const Dashboard: NextPage = () => {
     }
   };
 
-  // Handle attending an event
-  const handleAttendEvent = async (event: EventData) => {
-    if (!currentUser) {
-      alert("You need to be logged in to attend events");
-      return;
-    }
-
-    try {
-      // Check if user is already attending
-      const isAttending = event.attendees?.includes(currentUser.id);
-
-      if (isAttending) {
-        // Remove user from attendees
-        const updatedEvent = {
-          ...event,
-          attendees: event.attendees?.filter((id) => id !== currentUser.id),
-        };
-
-        await eventService.updateEvent(event.id!, updatedEvent);
-
-        // Update UI
-        setEvents((prevEvents) =>
-          prevEvents.map((e) =>
-            e.id === event.id ? { ...e, attendees: updatedEvent.attendees } : e
-          )
-        );
-        setFilteredEvents((prevFiltered) =>
-          prevFiltered.map((e) =>
-            e.id === event.id ? { ...e, attendees: updatedEvent.attendees } : e
-          )
-        );
-      } else {
-        // Add user to attendees
-        const updatedEvent = {
-          ...event,
-          attendees: [...(event.attendees || []), currentUser.id],
-        };
-
-        await eventService.updateEvent(event.id!, updatedEvent);
-
-        // Update UI
-        setEvents((prevEvents) =>
-          prevEvents.map((e) =>
-            e.id === event.id ? { ...e, attendees: updatedEvent.attendees } : e
-          )
-        );
-        setFilteredEvents((prevFiltered) =>
-          prevFiltered.map((e) =>
-            e.id === event.id ? { ...e, attendees: updatedEvent.attendees } : e
-          )
-        );
-      }
-    } catch (err) {
-      console.error("Error updating event attendance:", err);
-      alert("Failed to update attendance. Please try again.");
-    }
+  // Navigate to event details
+  const navigateToEvent = (eventId: number) => {
+    router.push(`/events/${eventId}`);
   };
 
   // Format date for display
@@ -161,6 +122,13 @@ const Dashboard: NextPage = () => {
   // Check if user is attending an event
   const isUserAttending = (event: EventData) => {
     return currentUser && event.attendees?.includes(currentUser.id);
+  };
+
+  // Format price for display
+  const formatPrice = (price: number | string | null | undefined) => {
+    if (price === null || price === undefined || price === '') return 'Free';
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return numPrice <= 0 ? 'Free' : `$${numPrice.toFixed(2)}`;
   };
 
   return (
@@ -245,8 +213,9 @@ const Dashboard: NextPage = () => {
             {filteredEvents.map((event) => (
               <div
                 key={event.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col relative"
+                className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col relative cursor-pointer"
                 style={{ borderTop: "4px solid #86CD82" }}
+                onClick={() => navigateToEvent(event.id!)}
               >
                 <div
                   className="absolute right-4 overflow-hidden"
@@ -357,35 +326,44 @@ const Dashboard: NextPage = () => {
                       </div>
                     )}
 
-                    {/* Virtual location link */}
-                    {event.virtual_location && (
-                      <div
-                        className="flex items-center mt-2 text-sm"
-                        style={{ color: "#666B6A" }}
+                    {/* Price information */}
+                    <div
+                      className="flex items-center mt-2 text-sm"
+                      style={{ color: "#666B6A" }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 mr-1"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <span>{formatPrice(event.ticket_price)}</span>
+                    </div>
+
+                    {/* Attendance status */}
+                    {isUserAttending(event) ? (
+                      <div className="mt-3">
+                        <span
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                        <a
-                          href={event.virtual_location}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                          style={{ color: "#72A276" }}
+                          You're attending
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-3">
+                        <span
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                         >
-                          Virtual Link
-                        </a>
+                          Click for details & registration
+                        </span>
                       </div>
                     )}
 
@@ -445,21 +423,6 @@ const Dashboard: NextPage = () => {
                         </div>
                       )}
                   </div>
-
-                  {/* Attend button */}
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      className="px-3 py-1 text-sm rounded-md text-white cursor-pointer hover:opacity-90 transition-opacity"
-                      style={{
-                        backgroundColor: isUserAttending(event)
-                          ? "#72A276"
-                          : "#86CD82",
-                      }}
-                      onClick={() => handleAttendEvent(event)}
-                    >
-                      {isUserAttending(event) ? "Attending ✓" : "Attend"}
-                    </button>
-                  </div>
                 </div>
               </div>
             ))}
@@ -468,6 +431,4 @@ const Dashboard: NextPage = () => {
       </main>
     </div>
   );
-};
-
-export default Dashboard;
+}

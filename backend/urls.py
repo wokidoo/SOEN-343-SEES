@@ -23,15 +23,25 @@ from .views import (
     UserRegisterView,
     EventListCreateView,
     MarkEventAsViewedView,
-    UserProfileView
+    UserProfileView,
+    QuizDetailView,
+    MaterialDetailView,
+    UserSearchView,
+    StripeCheckoutView,
+    stripe_webhook,
 )
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/users/", UserRegisterView.as_view(), name="user-register"),
     path("api/login/", UserLoginView.as_view(), name="user-login"),
-    path("api/profile/", UserProfileView.as_view(), name="user-profile"),  # Add this new endpoint
+    path("api/profile/", UserProfileView.as_view(), name="user-profile"),
+    path('api/users/search/', UserSearchView.as_view(), name='user-search'),
     path("api/events/", EventListCreateView.as_view(), name="events-list-create"),
     path("api/events/<int:pk>/mark-viewed/", MarkEventAsViewedView.as_view()),
     path("api/events/<int:pk>/", EventDetailView.as_view(), name="event-detail"),
+    path('api/quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
+    path('api/materials/<int:pk>/', MaterialDetailView.as_view(), name='material-detail'),
+    path('api/events/<int:event_id>/checkout/', StripeCheckoutView.as_view()),
+    path('webhook/stripe/', stripe_webhook, name='stripe-webhook'),
 ]
