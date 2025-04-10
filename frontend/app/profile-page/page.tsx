@@ -11,6 +11,14 @@ const ProfilePage = () => {
   const [error, setError] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState(null);
+  const [passwordData, setPasswordData] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: ""
+  });
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -27,8 +35,7 @@ const ProfilePage = () => {
         const userData = {
           first_name: response.data.first_name || "",
           last_name: response.data.last_name || "",
-          email: response.data.email || "",
-          password: ""
+          email: response.data.email || ""
         };
         
         setProfile(userData);
@@ -46,6 +53,15 @@ const ProfilePage = () => {
     if (isEditMode) {
       // When canceling edit, reset to original data
       setFormData({...profile});
+      // Reset password fields and state
+      setPasswordData({
+        current_password: "",
+        new_password: "",
+        confirm_password: ""
+      });
+      setIsChangingPassword(false);
+      setPasswordError("");
+      setPasswordSuccess("");
     }
     setIsEditMode(!isEditMode);
   };
@@ -55,17 +71,49 @@ const ProfilePage = () => {
     setFormData((prev) => (prev ? { ...prev, [name]: value } : null));
   };
 
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData) return;
+    
+    // Reset error/success messages
+    setPasswordError("");
+    setPasswordSuccess("");
 
     try {
       // Set loading state
       setLoading(true);
       
+      // Create the payload for the API call
+      const payload = { ...formData };
+      
+      // Add password data if password is being changed
+      if (isChangingPassword) {
+        // Validate passwords
+        if (passwordData.new_password !== passwordData.confirm_password) {
+          setPasswordError("New passwords do not match");
+          setLoading(false);
+          return;
+        }
+
+        if (passwordData.new_password && passwordData.new_password.length < 8) {
+          setPasswordError("Password must be at least 8 characters");
+          setLoading(false);
+          return;
+        }
+        
+        if (passwordData.new_password) {
+          payload.password = passwordData.new_password;
+          payload.current_password = passwordData.current_password;
+        }
+      }
+      
       // Make the API call to update the profile
-      // The endpoint is expecting a PUT request with the updated user data
-      await api.put('/api/profile/', formData);
+      await api.put('/api/profile/', payload);
       
       // Refresh the profile data
       await fetchProfile();
@@ -73,11 +121,31 @@ const ProfilePage = () => {
       // Exit edit mode
       setIsEditMode(false);
       
+      // Reset password fields
+      setPasswordData({
+        current_password: "",
+        new_password: "",
+        confirm_password: ""
+      });
+      setIsChangingPassword(false);
+      
       // Show success message
       alert("Profile updated successfully");
     } catch (err) {
       console.error("Error updating profile:", err);
-      setError("Failed to update profile. Please try again.");
+      
+      // Handle specific error messages from backend
+      if (err.response && err.response.data) {
+        if (err.response.data.error) {
+          setPasswordError(err.response.data.error);
+        } else if (err.response.data.message && err.response.data.message.includes("password")) {
+          setPasswordError(err.response.data.message);
+        } else {
+          setError("Failed to update profile. Please try again.");
+        }
+      } else {
+        setError("Failed to update profile. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -154,7 +222,7 @@ const ProfilePage = () => {
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                       <div>
                         <label
                           htmlFor="first_name"
@@ -212,9 +280,105 @@ const ProfilePage = () => {
                         />
                       </div>
                     </div>
+                    
+                    {/* Change Password Section */}
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium" style={{ color: "#08090A" }}>
+                          Change Password
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setIsChangingPassword(!isChangingPassword)}
+                          className="text-sm font-medium"
+                          style={{ color: "#5D9BD5" }}
+                        >
+                          {isChangingPassword ? "Cancel Password Change" : "Change Password"}
+                        </button>
+                      </div>
+                      
+                      {passwordError && (
+                        <div className="mb-4 p-3 rounded-md bg-red-50 text-red-700 text-sm">
+                          {passwordError}
+                        </div>
+                      )}
+                      
+                      {passwordSuccess && (
+                        <div className="mb-4 p-3 rounded-md bg-green-50 text-green-700 text-sm">
+                          {passwordSuccess}
+                        </div>
+                      )}
+                      
+                      {isChangingPassword && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="md:col-span-2">
+                            <label
+                              htmlFor="current_password"
+                              className="block text-sm font-medium mb-1"
+                              style={{ color: "#666B6A" }}
+                            >
+                              Current Password
+                            </label>
+                            <input
+                              type="password"
+                              name="current_password"
+                              id="current_password"
+                              value={passwordData.current_password}
+                              onChange={handlePasswordChange}
+                              className="p-2 w-full border rounded-md"
+                              style={{ borderColor: "#E2E8F0" }}
+                              required={isChangingPassword}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label
+                              htmlFor="new_password"
+                              className="block text-sm font-medium mb-1"
+                              style={{ color: "#666B6A" }}
+                            >
+                              New Password
+                            </label>
+                            <input
+                              type="password"
+                              name="new_password"
+                              id="new_password"
+                              value={passwordData.new_password}
+                              onChange={handlePasswordChange}
+                              className="p-2 w-full border rounded-md"
+                              style={{ borderColor: "#E2E8F0" }}
+                              required={isChangingPassword}
+                              minLength={8}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Password must be at least 8 characters
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label
+                              htmlFor="confirm_password"
+                              className="block text-sm font-medium mb-1"
+                              style={{ color: "#666B6A" }}
+                            >
+                              Confirm New Password
+                            </label>
+                            <input
+                              type="password"
+                              name="confirm_password"
+                              id="confirm_password"
+                              value={passwordData.confirm_password}
+                              onChange={handlePasswordChange}
+                              className="p-2 w-full border rounded-md"
+                              style={{ borderColor: "#E2E8F0" }}
+                              required={isChangingPassword}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </form>
                 ) : (
-                  // View Mode
                   <>
                     <div className="flex justify-between items-start">
                       <div className="flex items-start">

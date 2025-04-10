@@ -9,10 +9,13 @@ from django.views.decorators.csrf import csrf_exempt
 from .serializers import UserSerializer, EventSerializer, QuizSerializer, QuestionSerializer, MaterialSerializer
 from .models import Event, EventNotification, Quiz, Question, QuestionOption, Material, Ticket, Payment, User
 import json
+
 from django.conf import settings
 import stripe
 from django.shortcuts import redirect
 from django.urls import reverse
+from rest_framework.permissions import AllowAny
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -21,6 +24,7 @@ User = get_user_model()
 
 
 class UserRegisterView(APIView):
+    permission_classes = [AllowAny]  # Add this line
     def get(self, request):
         """Return a list of all users."""
         users = User.objects.all()
@@ -104,7 +108,7 @@ class UserLoginView(APIView):
 
 class UserProfileView(APIView):
     """
-    View to retrieve the currently authenticated user's profile
+    View to retrieve and update the currently authenticated user's profile
     """
     permission_classes = [IsAuthenticated]
     
@@ -115,12 +119,53 @@ class UserProfileView(APIView):
     
     def put(self, request):
         user = request.user
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        data = request.data.copy()
+        
+        # Check if this is a password update request
+        if 'password' in data and data['password']:
+            # Verify current password if provided
+            current_password = data.pop('current_password', None)
+            if current_password:
+                # Verify the current password
+                if not user.check_password(current_password):
+                    return Response(
+                        {"error": "Current password is incorrect"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                # Current password is required for security
+                return Response(
+                    {"error": "Current password is required to change password"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set the new password
+            user.set_password(data['password'])
+            user.save()
+            
+            # If only password is being updated, return success
+            if len(data) == 1:
+                return Response(
+                    {"message": "Password updated successfully"},
+                    status=status.HTTP_200_OK
+                )
+            
+            # Remove password from data as we've already handled it
+            data.pop('password')
+        
+        # Update other profile data if there's anything left
+        if data:
+            serializer = UserSerializer(user, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # If we've updated the password but there was no other data to update
+        return Response(
+            {"message": "Profile updated successfully"},
+            status=status.HTTP_200_OK
+        )
 
 class EventListCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -222,6 +267,17 @@ class EventListCreateView(APIView):
             # Update the request data
             data['organizers'] = list(organizer_ids)
         
+        # If speakers are provided, process them the same way as organizers
+        if 'speakers' in data:
+            # Convert to list if it's not already
+            speakers = data.getlist('speakers') if hasattr(data, 'getlist') else data.get('speakers', [])
+            
+            # Convert to a set to remove duplicates
+            speaker_ids = set(int(speaker_id) for speaker_id in speakers if str(speaker_id).isdigit())
+            
+            # Update the request data
+            data['speakers'] = list(speaker_ids)
+        
         # Create the event first without quizzes and materials
         event_data = {k: v for k, v in data.items() if k not in ['quizzes', 'materials', 'files']}
         serializer = EventSerializer(data=event_data)
@@ -260,14 +316,28 @@ class EventListCreateView(APIView):
                         correct_answer_index = question_data.get('correctAnswer', 0)
                         
                         for i, option_text in enumerate(options):
-                            if not option_text.strip():
+                            # Check if option_text is a string before calling strip()
+                            if isinstance(option_text, str) and not option_text.strip():
                                 continue  # Skip empty options
+                            # If it's a dict or other object type, extract the text value or skip
+                            elif isinstance(option_text, dict):
+                                # Try to get text from the dict - assumes there's a 'text' or 'value' key
+                                actual_text = option_text.get('text', option_text.get('value', ''))
+                                if not actual_text:
+                                    continue  # Skip if we can't find a valid text value
                                 
-                            QuestionOption.objects.create(
-                                question=question,
-                                option_text=option_text,
-                                is_correct=(i == correct_answer_index)
-                            )
+                                QuestionOption.objects.create(
+                                    question=question,
+                                    option_text=actual_text,
+                                    is_correct=(i == correct_answer_index)
+                                )
+                            else:
+                                # For any other type, convert to string
+                                QuestionOption.objects.create(
+                                    question=question,
+                                    option_text=str(option_text),
+                                    is_correct=(i == correct_answer_index)
+                                )
                     
                     elif question_type == 'true_false':
                         correct_answer = question_data.get('correctAnswer', 0)
@@ -724,6 +794,7 @@ class UserSearchView(APIView):
 
 stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
 
+
 class StripeCheckoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -845,6 +916,7 @@ class StripeCheckoutView(APIView):
             logger.error(f"Unhandled error in checkout: {str(e)}", exc_info=True)
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+stripeWebhook = os.getenv("STRIPE_WEBHOOK_SECRET")
 @csrf_exempt
 @require_POST
 def stripe_webhook(request):
@@ -856,7 +928,7 @@ def stripe_webhook(request):
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            payload, sig_header, stripeWebhook
         )
     except ValueError as e:
         # Invalid payload
