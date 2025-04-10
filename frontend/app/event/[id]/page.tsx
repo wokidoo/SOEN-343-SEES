@@ -539,11 +539,9 @@ export default function EventDetails({ params }) {
                               key={speaker.id || `speaker-${index}`}
                               className="text-gray-700"
                             >
-                              {speaker.name || speaker.first_name
-                                ? `${speaker.first_name || ""} ${
-                                    speaker.last_name || ""
-                                  }`
-                                : `Speaker ${index + 1}`}
+                              {`${speaker.first_name || ""} ${
+                                speaker.last_name || ""
+                              }`}
                             </li>
                           ))}
                         </ul>
@@ -974,12 +972,9 @@ export default function EventDetails({ params }) {
                                 />
                               </svg>
                               <div>
-                                <h4 className="font-medium">{material.name}</h4>
-                                {material.description && (
-                                  <p className="text-sm text-gray-500">
-                                    {material.description}
-                                  </p>
-                                )}
+                                <h4 className="font-medium">
+                                  {material.title}
+                                </h4>
                               </div>
                             </div>
                             <div className="flex items-center space-x-4">
