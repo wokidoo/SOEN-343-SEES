@@ -391,15 +391,6 @@ export default function MyEvents() {
                   </div>
                 ) : (
                   <div>
-                    <div className="flex justify-end mb-4">
-                      <button
-                        className="px-4 py-2 rounded-md text-white cursor-pointer hover:opacity-90 transition-opacity"
-                        style={{ backgroundColor: "#86CD82" }}
-                        onClick={() => router.push("/create-event")}
-                      >
-                        Create New Event
-                      </button>
-                    </div>
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                       {organizedEvents.map((event) => renderEventCard(event, "organizer"))}
                     </div>
