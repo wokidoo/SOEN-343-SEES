@@ -102,7 +102,7 @@ class UserLoginView(APIView):
 
 class UserProfileView(APIView):
     """
-    View to retrieve the currently authenticated user's profile
+    View to retrieve and update the currently authenticated user's profile
     """
     permission_classes = [IsAuthenticated]
     
@@ -113,12 +113,53 @@ class UserProfileView(APIView):
     
     def put(self, request):
         user = request.user
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        data = request.data.copy()
+        
+        # Check if this is a password update request
+        if 'password' in data and data['password']:
+            # Verify current password if provided
+            current_password = data.pop('current_password', None)
+            if current_password:
+                # Verify the current password
+                if not user.check_password(current_password):
+                    return Response(
+                        {"error": "Current password is incorrect"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                # Current password is required for security
+                return Response(
+                    {"error": "Current password is required to change password"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set the new password
+            user.set_password(data['password'])
+            user.save()
+            
+            # If only password is being updated, return success
+            if len(data) == 1:
+                return Response(
+                    {"message": "Password updated successfully"},
+                    status=status.HTTP_200_OK
+                )
+            
+            # Remove password from data as we've already handled it
+            data.pop('password')
+        
+        # Update other profile data if there's anything left
+        if data:
+            serializer = UserSerializer(user, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # If we've updated the password but there was no other data to update
+        return Response(
+            {"message": "Profile updated successfully"},
+            status=status.HTTP_200_OK
+        )
 
 class EventListCreateView(APIView):
     permission_classes = [IsAuthenticated]
