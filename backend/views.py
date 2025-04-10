@@ -10,7 +10,8 @@ from .serializers import UserSerializer, EventSerializer, QuizSerializer, Questi
 from .models import Event, EventNotification, Quiz, Question, QuestionOption, Material
 import json
 import stripe
-from django.conf import settings
+import os
+from dotenv import load_dotenv
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -362,6 +363,10 @@ class EventDetailView(APIView):
         event_data = {k: v for k, v in data.items() if k not in ['quizzes', 'materials', 'files']}
         serializer = EventSerializer(event, data=event_data, partial=True, context={"request": request})
         
+        # Update basic event information
+        event_data = {k: v for k, v in data.items() if k not in ['quizzes', 'materials', 'files']}
+        serializer = EventSerializer(event, data=event_data, partial=True, context={"request": request})
+        
         if serializer.is_valid():
             updated_event = serializer.save()
             
@@ -369,6 +374,115 @@ class EventDetailView(APIView):
             if not updated_event.is_organizer(request.user):
                 updated_event.add_organizer(request.user)
             
+            # Handle quizzes update if provided
+            if 'quizzes' in data:
+                quizzes_data = []
+                if isinstance(data['quizzes'], str):
+                    try:
+                        quizzes_data = json.loads(data['quizzes'])
+                    except json.JSONDecodeError:
+                        return Response({"error": "Invalid quiz data format"}, 
+                                      status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    quizzes_data = data['quizzes']
+                
+                # Update quizzes (delete and recreate for simplicity)
+                Quiz.objects.filter(event=updated_event).delete()
+                
+                # Create new quizzes
+                for quiz_data in quizzes_data:
+                    if not quiz_data.get('visible', False):
+                        continue  # Skip quizzes marked as not visible
+                        
+                    quiz = Quiz.objects.create(
+                        event=updated_event,
+                        title=quiz_data.get('title', 'Untitled Quiz'),
+                        visible=True
+                    )
+                    
+                    # Create questions for this quiz
+                    for question_data in quiz_data.get('questions', []):
+                        question_type = question_data.get('type', 'multiple_choice')
+                        
+                        question = Question.objects.create(
+                            quiz=quiz,
+                            question_text=question_data.get('question', ''),
+                            question_type=question_type
+                        )
+                        
+                        # Create options based on question type
+                        if question_type == 'multiple_choice':
+                            options = question_data.get('options', [])
+                            correct_answer_index = question_data.get('correctAnswer', 0)
+                            
+                            for i, option_text in enumerate(options):
+                                if not option_text.strip():
+                                    continue  # Skip empty options
+                                    
+                                QuestionOption.objects.create(
+                                    question=question,
+                                    option_text=option_text,
+                                    is_correct=(i == correct_answer_index)
+                                )
+                        
+                        elif question_type == 'true_false':
+                            correct_answer = question_data.get('correctAnswer', 0)
+                            
+                            # Create True option
+                            QuestionOption.objects.create(
+                                question=question,
+                                option_text='True',
+                                is_correct=(correct_answer == 0)
+                            )
+                            
+                            # Create False option
+                            QuestionOption.objects.create(
+                                question=question,
+                                option_text='False',
+                                is_correct=(correct_answer == 1)
+                            )
+            
+            # Handle materials update if files are provided
+            if request.FILES:
+                files = request.FILES.getlist('files')
+                materials_meta = []
+                
+                # Process materials metadata if provided
+                if 'materials' in data and isinstance(data['materials'], str):
+                    try:
+                        materials_meta = json.loads(data['materials'])
+                    except json.JSONDecodeError:
+                        return Response({"error": "Invalid materials data format"}, 
+                                       status=status.HTTP_400_BAD_REQUEST)
+                
+                # Update approach: delete existing ones and create new ones
+                if 'replace_materials' in data and data['replace_materials'] == 'true':
+                    Material.objects.filter(event=updated_event).delete()
+                
+                # Create new materials
+                for i, file in enumerate(files):
+                    material = {
+                        'file': file,
+                        'title': file.name,  # Default to filename
+                        'visible': False     # Default visibility
+                    }
+                    
+                    # Override with metadata if available
+                    if i < len(materials_meta):
+                        if 'name' in materials_meta[i]:
+                            material['title'] = materials_meta[i]['name']
+                        if 'visible' in materials_meta[i]:
+                            material['visible'] = materials_meta[i]['visible']
+                    
+                    if material.get('visible', False):
+                        Material.objects.create(
+                            event=updated_event,
+                            title=material.get('title', 'Untitled Material'),
+                            file=material.get('file'),
+                            visible=True
+                        )
+            
+            # Return the updated event with all related data
             # Handle quizzes update if provided
             if 'quizzes' in data:
                 quizzes_data = []
@@ -604,7 +718,8 @@ class UserSearchView(APIView):
 # This test secret API key is a placeholder. Don't include personal details in requests with this key.
 # To see your test secret API key embedded in code samples, sign in to your Stripe account.
 # You can also find your test secret API key at https://dashboard.stripe.com/test/apikeys.
-stripe.api_key = settings.STRIPE_SECRET_KEY
+stripe.api_key = os.getenv("STRIPE_TEST_SECRET_KEY")
+frontendURL = os.getenv("FRONTEND_URL")
 
 class StripeCheckoutView(APIView):
     permission_classes = [IsAuthenticated]
@@ -663,7 +778,7 @@ class StripeCheckoutView(APIView):
             }]
             
             # Define success and cancel URLs
-            domain = settings.FRONTEND_URL  # Add this to settings.py
+            domain = frontendURL # Add this to settings.py
             success_url = f"{domain}/events/{event_id}?payment_success=true"
             cancel_url = f"{domain}/events/{event_id}?payment_canceled=true"
             
@@ -692,6 +807,7 @@ class StripeCheckoutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+stripeWebhook = os.getenv("STRIPE_WEBHOOK_SECRET")
 @csrf_exempt
 @require_POST
 def stripe_webhook(request):
@@ -703,7 +819,7 @@ def stripe_webhook(request):
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            payload, sig_header, stripeWebhook
         )
     except ValueError as e:
         # Invalid payload
